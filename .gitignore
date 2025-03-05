@@ -1,0 +1,14 @@
+# Virtual environments
+venv/
+.venv/
+
+# Ignore compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore model outputs or large files
+tomato_ripeness_classifier/
+
+# Ignore static files if they are generated
+static/
