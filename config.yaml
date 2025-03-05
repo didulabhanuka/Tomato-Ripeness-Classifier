@@ -1,0 +1,5 @@
+train: /content/drive/MyDrive/tomato_ripeness_classifier/dataset_augmented/train
+val: /content/drive/MyDrive/tomato_ripeness_classifier/dataset_augmented/val
+
+nc: 6
+names: ["b_fully_ripened", "b_half_ripened", "b_green", "l_fully_ripened", "l_half_ripened", "l_green"]
