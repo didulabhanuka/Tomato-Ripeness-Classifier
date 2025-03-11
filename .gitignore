@@ -16,3 +16,8 @@ static/
 .ipynb/
 .py
 *.json
+
+# Ignore private files & credentials
+*.json  
+!config.json  
+harvesta-24-25j-250-firebase-adminsdk.json  
