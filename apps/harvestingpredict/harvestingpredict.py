@@ -1,8 +1,16 @@
 import os
 import yaml
+import firebase_admin
+from firebase_admin import credentials, firestore
+from datetime import datetime
 from PIL import Image
 from collections import defaultdict
-from models.yolo_model import yolo_model
+from apps.harvestingpredict.models.yolo_model import yolo_model
+
+# Firebase Initialization
+cred = credentials.Certificate("harvesta-24-25j-250-firebase-adminsdk.json")  # Add your Firebase credentials
+firebase_admin.initialize_app(cred)
+db = firestore.client()
 
 # Load Class Names from YAML
 yaml_path = "config.yaml"
@@ -21,6 +29,18 @@ category_mapping = {
     class_names[3]: "ripe"
 }
 
+def fetch_growth_speed():
+    """Fetch the latest growth speed of ripe tomatoes from Firebase."""
+    try:
+        growth_ref = db.collection("growth_rates").order_by("date", direction=firestore.Query.DESCENDING).limit(1).get()
+        if growth_ref and growth_ref[0].exists:
+            growth_speed = growth_ref[0].to_dict().get("growth_speed_ripe")
+            return float(growth_speed) if growth_speed is not None else 5.0  # Default fallback to 5% per day
+    except Exception as e:
+        print(f"Error fetching growth speed: {e}")
+    return 5.0  # Fallback default growth speed if Firebase retrieval fails
+
+
 def calculate_percentage(counts):
     """Calculate ripeness percentage."""
     total = sum(counts.values())
@@ -30,8 +50,13 @@ def calculate_percentage(counts):
         "ripe": round((counts.get("ripe", 0) / total) * 100, 2) if total else 0.0
     }
 
+def calculate_harvest_time(ripe_percentage):
+    """Calculate the optimal harvest time in days."""
+    growth_speed = fetch_growth_speed()
+    return round((70 - ripe_percentage) / growth_speed, 2)
+
 def environmental_recommendations(percentages):
-    """Calculate recommended temperature, light intensity, and humidity."""
+    """Calculate recommended environmental conditions."""
     temp = round((percentages["unripe"] * 20 + percentages["half-ripe"] * 22 + percentages["ripe"] * 24) / 100, 2)
     light = round((percentages["unripe"] * 7000 + percentages["half-ripe"] * 5000 + percentages["ripe"] * 3000) / 100, 2)
     humidity = round((percentages["unripe"] * 90 + percentages["half-ripe"] * 80 + percentages["ripe"] * 72.5) / 100, 2)
@@ -41,6 +66,28 @@ def environmental_recommendations(percentages):
         "light_intensity_setpoint": f"{light} lux",
         "humidity_setpoint": f"{humidity} %RH"
     }
+
+
+def save_growth_speed(ripe_percentage):
+    """Save the calculated growth speed to Firebase."""
+    try:
+        growth_speed = fetch_growth_speed()  # Fetch latest growth speed (fallback if needed)
+        
+        # Save new entry with timestamp
+        data = {
+            "date": datetime.utcnow().isoformat(),
+            "ripe_percentage": ripe_percentage,
+            "growth_speed_ripe": growth_speed,
+            "temperature": 22,  # Example: Can be replaced with real values
+            "light_intensity": 5000,
+            "humidity": 80
+        }
+        
+        db.collection("growth_rates").add(data)
+        print(f"Saved growth speed to Firebase: {data}")
+
+    except Exception as e:
+        print(f"Error saving growth speed: {e}")
 
 def process_images(files):
     """Process multiple images and return combined results."""
@@ -78,12 +125,19 @@ def process_images(files):
     # Compute ripeness percentages
     ripeness_percentages = calculate_percentage({k: v["count"] for k, v in category_results.items()})
 
+    # Compute harvesting time
+    harvest_time = calculate_harvest_time(ripeness_percentages["ripe"])
+
+    # Save growth speed in Firebase
+    save_growth_speed(ripeness_percentages["ripe"])
+
     # Compute environmental recommendations
     recommendations = environmental_recommendations(ripeness_percentages)
 
     return {
         "predictions": category_results,
         "ripeness_percentages": ripeness_percentages,
+        "optimal_harvest_time_days": harvest_time,
         "environmental_recommendations": recommendations,
         "yolo_images": processed_images
     }
