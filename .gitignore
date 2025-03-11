@@ -13,7 +13,7 @@ tomato_ripeness_classifier/
 static/
 
 # Ignore private files
-.ipynb/
+.ipynb
 .py
 *.json
 
