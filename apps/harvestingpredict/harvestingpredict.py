@@ -89,8 +89,27 @@ def save_growth_speed(ripe_percentage):
     except Exception as e:
         print(f"Error saving growth speed: {e}")
 
+from datetime import datetime
+
+def save_ripeness_data(ripeness_percentages):
+    """Save all ripeness stage percentages to Firebase Firestore."""
+    try:
+        data = {
+            "date": datetime.utcnow().isoformat(),
+            "unripe_percentage": ripeness_percentages.get("unripe", 0.0),
+            "half_ripe_percentage": ripeness_percentages.get("half-ripe", 0.0),
+            "ripe_percentage": ripeness_percentages.get("ripe", 0.0),
+        }
+
+        # Add entry to Firestore collection "growth_rates"
+        db.collection("growth_rates").add(data)
+        print(f"Saved ripeness data to Firebase: {data}")
+
+    except Exception as e:
+        print(f"Error saving ripeness data: {e}")
+
 def process_images(files):
-    """Process multiple images and return combined results."""
+    """Process multiple images, calculate ripeness, and save to Firebase."""
     category_detections = defaultdict(list)
     processed_images = []
 
@@ -113,7 +132,7 @@ def process_images(files):
             category = category_mapping.get(cls_name, "unknown")
             category_detections[category].append(score)
 
-    # Compute final count and average confidence per category
+    # Compute count and average confidence per category
     category_results = {
         category: {
             "count": len(scores),
@@ -125,11 +144,11 @@ def process_images(files):
     # Compute ripeness percentages
     ripeness_percentages = calculate_percentage({k: v["count"] for k, v in category_results.items()})
 
+    # Save ripeness data in Firebase
+    save_ripeness_data(ripeness_percentages)
+
     # Compute harvesting time
     harvest_time = calculate_harvest_time(ripeness_percentages["ripe"])
-
-    # Save growth speed in Firebase
-    save_growth_speed(ripeness_percentages["ripe"])
 
     # Compute environmental recommendations
     recommendations = environmental_recommendations(ripeness_percentages)

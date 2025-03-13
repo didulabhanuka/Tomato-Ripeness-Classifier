@@ -7,7 +7,7 @@ __pycache__/
 *.pyo
 
 # Ignore model outputs or large files
-tomato_ripeness_classifier/
+tomato_ripeness_classifier/dataset_augmented/
 
 # Ignore static files if they are generated
 static/
